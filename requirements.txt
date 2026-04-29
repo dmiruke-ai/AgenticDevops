@@ -19,7 +19,7 @@ redis>=5.0.0
 hiredis>=2.3.0
 
 # OPA client
-opa-client-python>=1.1.0
+# opa-client-python>=1.1.0  # TODO: Find correct package name or implement HTTP client
 
 # Observability
 opentelemetry-api>=1.22.0

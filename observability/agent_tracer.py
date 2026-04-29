@@ -164,3 +164,52 @@ def record_llm_call(
 def record_validation_retry(error_type: str) -> None:
     """Record a validation retry for a specific error type."""
     VALIDATION_RETRY_COUNTER.labels(error_type=error_type).inc()
+
+
+# DAG Execution Metrics
+DAG_EXECUTION_COUNTER = Counter(
+    "devops_agent_dag_executions_total",
+    "Total DAG executions",
+    ["dag_id", "session_id", "status"],
+)
+
+DAG_EXECUTION_TIME = Histogram(
+    "devops_agent_dag_execution_seconds",
+    "DAG execution time",
+    ["dag_id"],
+    buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 120.0],
+)
+
+DAG_NODE_COUNT = Histogram(
+    "devops_agent_dag_nodes",
+    "Number of nodes in DAG",
+    ["dag_id"],
+    buckets=[1, 3, 5, 10, 20, 50],
+)
+
+
+def record_dag_execution(
+    dag_id: str,
+    session_id: str,
+    total_nodes: int,
+    completed_nodes: int,
+    failed_nodes: int,
+    execution_time: float,
+) -> None:
+    """
+    Record metrics for DAG execution.
+
+    Args:
+        dag_id: DAG identifier
+        session_id: Session identifier
+        total_nodes: Total number of nodes
+        completed_nodes: Number of successfully completed nodes
+        failed_nodes: Number of failed nodes
+        execution_time: Execution time in seconds
+    """
+    status = "success" if failed_nodes == 0 else "failure"
+    DAG_EXECUTION_COUNTER.labels(
+        dag_id=dag_id, session_id=session_id, status=status
+    ).inc()
+    DAG_EXECUTION_TIME.labels(dag_id=dag_id).observe(execution_time)
+    DAG_NODE_COUNT.labels(dag_id=dag_id).observe(total_nodes)
