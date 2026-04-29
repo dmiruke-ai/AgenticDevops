@@ -15,6 +15,7 @@ from execution.dag_templates import (
     create_finops_only_dag,
 )
 from execution.executor import DAGExecutor, ExecutionResult
+from execution.output_router import OutputMode, OutputModeRouter, create_output_router
 
 __all__ = [
     "IntentDAG",
@@ -29,4 +30,7 @@ __all__ = [
     "create_finops_only_dag",
     "create_artifacts_only_dag",
     "create_debug_workflow_dag",
+    "OutputMode",
+    "OutputModeRouter",
+    "create_output_router",
 ]
