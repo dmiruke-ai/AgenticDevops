@@ -11,6 +11,8 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
+import instructor
+from anthropic import Anthropic
 
 
 class TerraformErrorType(str, Enum):
@@ -89,6 +91,22 @@ class ErrorClassificationResult(BaseModel):
     # Metadata
     classified_at: datetime = Field(default_factory=datetime.utcnow)
     classified_by: str = Field("regex", description="Classification method (regex/llm)")
+
+
+class LLMClassificationOutput(BaseModel):
+    """
+    Structured output from LLM error classifier (PROMPT_CHAIN_03).
+
+    Used by instructor to validate LLM JSON output.
+    """
+    error_type: str = Field(..., description="Classified error type")
+    affected_resource: Optional[str] = Field(None, description="Resource that failed")
+    affected_module: str = Field("unknown", description="Module that generated this resource")
+    fix_hint: str = Field(..., description="Human-readable fix suggestion")
+    intent_spec_mutation: dict = Field(default_factory=dict, description="IntentSpec mutation for fix")
+    planner_instruction: str = Field(..., description="Instructions for smart replanner")
+    is_retryable: bool = Field(True, description="Whether error is retryable")
+    requires_user_input: bool = Field(False, description="Whether fix requires user clarification")
 
 
 # Error type to fix hint mapping (for regex classifier)
@@ -279,6 +297,75 @@ class TerraformErrorClassifier:
             ),
         }
 
+        # Initialize instructor client for LLM fallback (S3-04)
+        from config import config
+        self.client = instructor.from_anthropic(Anthropic(api_key=config.anthropic_api_key))
+        self.classifier_model = config.classifier_model
+
+    def _classify_with_llm(self, stderr_output: str, affected_resource: Optional[str]) -> LLMClassificationOutput:
+        """
+        LLM fallback classifier for UNKNOWN errors (S3-04 / PROMPT_CHAIN_03).
+
+        Uses claude-haiku-4 with instructor for structured output.
+
+        Args:
+            stderr_output: Raw stderr from terraform
+            affected_resource: Resource that failed (if known)
+
+        Returns:
+            LLMClassificationOutput with structured classification
+        """
+        # PROMPT_CHAIN_03: Terraform Error Classification
+        system_prompt = """You are a Terraform Error Classification Engine.
+Your job is to classify a raw Terraform error into a structured error object.
+
+You must classify into ONE of these types:
+IAM_PERMISSION_DENIED | IAM_INVALID_POLICY | RESOURCE_ALREADY_EXISTS |
+RESOURCE_NOT_FOUND | RESOURCE_IN_USE | QUOTA_EXCEEDED | RATE_LIMIT |
+DEPENDENCY_VIOLATION | INVALID_CIDR_BLOCK | SUBNET_CONFLICT | CIDR_OVERLAP |
+SECURITY_GROUP_RULE_CONFLICT | MISSING_REQUIRED_PARAMETER | INVALID_PARAMETER |
+INVALID_REFERENCE | UNKNOWN
+
+Provide chain-of-thought reasoning, then output structured JSON."""
+
+        user_prompt = f"""[RAW_ERROR_BLOCK]:
+{stderr_output}
+
+[AFFECTED_RESOURCE_TYPE]: {affected_resource or "unknown"}
+
+REASONING:
+Step 1: What is the root cause of this error? (one sentence)
+Step 2: Which error type matches? Why?
+Step 3: What is the minimal fix? (what must change in the Terraform to resolve this)
+Step 4: Is this retryable without user input? (yes/no and why)
+Step 5: Which module generated this resource? (iam | network | compute | pipeline | observability | unknown)
+
+OUTPUT (strict JSON with the fields in LLMClassificationOutput):"""
+
+        try:
+            # Use instructor for structured output with auto-retry
+            response = self.client.messages.create(
+                model=self.classifier_model,
+                max_tokens=1024,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ],
+                system=system_prompt,
+                response_model=LLMClassificationOutput,
+            )
+            return response
+        except Exception as e:
+            # If LLM fails, return UNKNOWN with error message
+            return LLMClassificationOutput(
+                error_type="UNKNOWN",
+                affected_resource=affected_resource,
+                affected_module="unknown",
+                fix_hint=f"LLM classification failed: {str(e)}. Manual investigation required.",
+                planner_instruction="Review error manually and determine fix strategy.",
+                is_retryable=False,
+                requires_user_input=True,
+            )
+
     def classify(self, stderr_output: str, affected_resources: List[str]) -> ErrorClassificationResult:
         """
         Classify Terraform error from stderr output.
@@ -300,56 +387,96 @@ class TerraformErrorClassifier:
                 confidence = 0.95  # High confidence for regex match
                 break
 
-        # Fall back to UNKNOWN if no pattern matches (will trigger LLM in S3-04)
+        # Fall back to LLM if no pattern matches (S3-04)
         if error_type is None:
-            error_type = TerraformErrorType.UNKNOWN
-            confidence = 0.0
+            # Use LLM fallback classifier (PROMPT_CHAIN_03)
+            affected_resource = affected_resources[0] if affected_resources else None
+            llm_result = self._classify_with_llm(stderr_output, affected_resource)
 
-        # Extract line number if present
-        line_number = None
-        line_match = __import__('re').search(r'on (\w+\.tf) line (\d+)', stderr_output)
-        if line_match:
-            line_number = int(line_match.group(2))
+            # Map LLM error_type string to TerraformErrorType enum
+            try:
+                # LLM returns uppercase strings like "IAM_PERMISSION_DENIED"
+                error_type = TerraformErrorType(llm_result.error_type.lower())
+            except ValueError:
+                # If LLM returns invalid type, default to UNKNOWN
+                error_type = TerraformErrorType.UNKNOWN
 
-        # Build TerraformError
-        error = TerraformError(
-            error_type=error_type,
-            error_message=stderr_output[:500],  # Truncate for storage
-            affected_resource=affected_resources[0] if affected_resources else None,
-            line_number=line_number,
-            fix_hint=ERROR_FIX_HINTS[error_type],
-            planner_instruction=PLANNER_INSTRUCTIONS[error_type],
-        )
+            confidence = 0.75  # Medium confidence for LLM classification
+            classified_by = "llm"
 
-        # Build suggested actions based on error type
-        suggested_actions = []
-        if error_type == TerraformErrorType.RATE_LIMIT:
-            suggested_actions = ["Wait 60 seconds", "Retry terraform operation"]
-        elif error_type == TerraformErrorType.RESOURCE_ALREADY_EXISTS:
-            suggested_actions = ["Use terraform import", "Rename resource with unique suffix"]
-        elif error_type == TerraformErrorType.IAM_PERMISSION_DENIED:
-            suggested_actions = ["Check IAM permissions", "Grant required permissions", "Reduce scope if over-permissioned"]
-        elif error_type == TerraformErrorType.QUOTA_EXCEEDED:
-            suggested_actions = ["Request quota increase", "Use different region", "Reduce resource count"]
-        elif error_type == TerraformErrorType.UNKNOWN:
-            suggested_actions = ["Analyze error manually", "Check Terraform documentation"]
+            # Extract line number if present
+            line_number = None
+            line_match = __import__('re').search(r'on (\w+\.tf) line (\d+)', stderr_output)
+            if line_match:
+                line_number = int(line_match.group(2))
+
+            # Build TerraformError from LLM output
+            error = TerraformError(
+                error_type=error_type,
+                error_message=stderr_output[:500],
+                affected_resource=llm_result.affected_resource or affected_resource,
+                line_number=line_number,
+                fix_hint=llm_result.fix_hint,
+                planner_instruction=llm_result.planner_instruction,
+            )
+
+            # Use LLM-provided retryability
+            requires_user_input = llm_result.requires_user_input
+
+            # Build suggested actions from LLM fix_hint
+            suggested_actions = [llm_result.fix_hint]
+
+            # Build failed modules from affected_resources
+            failed_modules = []
+            if affected_resources:
+                for resource in affected_resources:
+                    failed_modules.append(f"{resource.split('.')[0]}.tf")
+
         else:
-            suggested_actions = ["Regenerate failed module", "Check error message for details"]
+            # Regex match successful
+            confidence = 0.95
+            classified_by = "regex"
 
-        # Determine if user input is required
-        requires_user_input = error_type in [
-            TerraformErrorType.UNKNOWN,
-            TerraformErrorType.QUOTA_EXCEEDED,
-            TerraformErrorType.IAM_PERMISSION_DENIED,
-        ]
+            # Extract line number if present
+            line_number = None
+            line_match = __import__('re').search(r'on (\w+\.tf) line (\d+)', stderr_output)
+            if line_match:
+                line_number = int(line_match.group(2))
 
-        # Build failed modules list
-        failed_modules = []
-        if affected_resources:
-            # Extract module names from resource names (e.g., "aws_eks_cluster.main" -> "main.tf")
-            for resource in affected_resources:
-                # Assume module name matches resource prefix
-                failed_modules.append(f"{resource.split('.')[0]}.tf")
+            # Build TerraformError
+            error = TerraformError(
+                error_type=error_type,
+                error_message=stderr_output[:500],
+                affected_resource=affected_resources[0] if affected_resources else None,
+                line_number=line_number,
+                fix_hint=ERROR_FIX_HINTS[error_type],
+                planner_instruction=PLANNER_INSTRUCTIONS[error_type],
+            )
+
+            # Build suggested actions based on error type
+            suggested_actions = []
+            if error_type == TerraformErrorType.RATE_LIMIT:
+                suggested_actions = ["Wait 60 seconds", "Retry terraform operation"]
+            elif error_type == TerraformErrorType.RESOURCE_ALREADY_EXISTS:
+                suggested_actions = ["Use terraform import", "Rename resource with unique suffix"]
+            elif error_type == TerraformErrorType.IAM_PERMISSION_DENIED:
+                suggested_actions = ["Check IAM permissions", "Grant required permissions", "Reduce scope if over-permissioned"]
+            elif error_type == TerraformErrorType.QUOTA_EXCEEDED:
+                suggested_actions = ["Request quota increase", "Use different region", "Reduce resource count"]
+            else:
+                suggested_actions = ["Regenerate failed module", "Check error message for details"]
+
+            # Determine if user input is required
+            requires_user_input = error_type in [
+                TerraformErrorType.QUOTA_EXCEEDED,
+                TerraformErrorType.IAM_PERMISSION_DENIED,
+            ]
+
+            # Build failed modules list
+            failed_modules = []
+            if affected_resources:
+                for resource in affected_resources:
+                    failed_modules.append(f"{resource.split('.')[0]}.tf")
 
         return ErrorClassificationResult(
             error=error,
@@ -358,7 +485,7 @@ class TerraformErrorClassifier:
             preserve_modules=[],  # Will be determined by replanner in S3-05
             suggested_actions=suggested_actions,
             requires_user_input=requires_user_input,
-            classified_by="regex" if confidence > 0.5 else "unknown",
+            classified_by=classified_by,
         )
 
 
