@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # FastAPI Application
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPA_URL=http://opa:8181
+      - OTLP_ENDPOINT=http://jaeger:4317
+      - PROMETHEUS_PORT=9090
+    depends_on:
+      - redis
+      - opa
+      - jaeger
+    volumes:
+      - ..:/app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - devops-agent
+
+  # Redis for session state
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - devops-agent
+
+  # OPA Policy Engine
+  opa:
+    image: openpolicyagent/opa:latest
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./opa/bundle:/bundle
+    command:
+      - "run"
+      - "--server"
+      - "--bundle"
+      - "/bundle"
+      - "--addr"
+      - "0.0.0.0:8181"
+    networks:
+      - devops-agent
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - devops-agent
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - devops-agent
+
+networks:
+  devops-agent:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:
