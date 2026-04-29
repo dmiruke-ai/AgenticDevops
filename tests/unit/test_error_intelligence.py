@@ -341,3 +341,213 @@ class TestErrorTypeCategories:
             TerraformErrorType.INVALID_REFERENCE,
         ]
         assert len(validation_errors) == 3
+
+
+class TestRegexPatternClassification:
+    """Test S3-03: Regex pattern classification."""
+
+    def test_classify_resource_already_exists(self):
+        """Test RESOURCE_ALREADY_EXISTS pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: Resource already exists: aws_eks_cluster.main"
+
+        result = classifier.classify(stderr, ["aws_eks_cluster.main"])
+
+        assert result.error.error_type == TerraformErrorType.RESOURCE_ALREADY_EXISTS
+        assert result.confidence == 0.95
+        assert result.classified_by == "regex"
+        assert "import" in " ".join(result.suggested_actions).lower()
+
+    def test_classify_resource_not_found(self):
+        """Test RESOURCE_NOT_FOUND pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: ResourceNotFoundException: The specified VPC does not exist"
+
+        result = classifier.classify(stderr, ["aws_vpc.main"])
+
+        assert result.error.error_type == TerraformErrorType.RESOURCE_NOT_FOUND
+        assert result.confidence == 0.95
+        assert result.classified_by == "regex"
+
+    def test_classify_iam_permission_denied(self):
+        """Test IAM_PERMISSION_DENIED pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: AccessDenied: User is not authorized to perform: iam:CreateRole"
+
+        result = classifier.classify(stderr, ["aws_iam_role.eks"])
+
+        assert result.error.error_type == TerraformErrorType.IAM_PERMISSION_DENIED
+        assert result.confidence == 0.95
+        assert result.requires_user_input is True
+        assert "permission" in " ".join(result.suggested_actions).lower()
+
+    def test_classify_subnet_conflict(self):
+        """Test SUBNET_CONFLICT pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: SubnetConflict: The CIDR block 10.0.1.0/24 conflicts with existing subnet"
+
+        result = classifier.classify(stderr, ["aws_subnet.private"])
+
+        assert result.error.error_type == TerraformErrorType.SUBNET_CONFLICT
+        assert result.confidence == 0.95
+
+    def test_classify_cidr_overlap(self):
+        """Test CIDR_OVERLAP pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: InvalidVpcRange: CIDR block 10.0.0.0/16 overlaps with existing VPC"
+
+        result = classifier.classify(stderr, ["aws_vpc.main"])
+
+        assert result.error.error_type == TerraformErrorType.CIDR_OVERLAP
+        assert result.confidence == 0.95
+
+    def test_classify_quota_exceeded(self):
+        """Test QUOTA_EXCEEDED pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: LimitExceeded: You have exceeded the maximum number of VPCs in this region"
+
+        result = classifier.classify(stderr, ["aws_vpc.main"])
+
+        assert result.error.error_type == TerraformErrorType.QUOTA_EXCEEDED
+        assert result.confidence == 0.95
+        assert result.requires_user_input is True
+        assert "quota" in " ".join(result.suggested_actions).lower()
+
+    def test_classify_rate_limit(self):
+        """Test RATE_LIMIT pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: Throttling: Rate exceeded. Please retry after 60 seconds"
+
+        result = classifier.classify(stderr, ["aws_eks_cluster.main"])
+
+        assert result.error.error_type == TerraformErrorType.RATE_LIMIT
+        assert result.confidence == 0.95
+        assert result.requires_user_input is False
+        assert "Wait" in result.suggested_actions[0]
+
+    def test_classify_invalid_parameter(self):
+        """Test INVALID_PARAMETER pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: InvalidParameterValue: Instance type 't99.mega' is not supported"
+
+        result = classifier.classify(stderr, ["aws_instance.web"])
+
+        assert result.error.error_type == TerraformErrorType.INVALID_PARAMETER
+        assert result.confidence == 0.95
+
+    def test_classify_missing_required_parameter(self):
+        """Test MISSING_REQUIRED_PARAMETER pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: MissingParameter: Required parameter 'vpc_id' is missing"
+
+        result = classifier.classify(stderr, ["aws_subnet.private"])
+
+        assert result.error.error_type == TerraformErrorType.MISSING_REQUIRED_PARAMETER
+        assert result.confidence == 0.95
+
+    def test_classify_invalid_reference(self):
+        """Test INVALID_REFERENCE pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: Reference to undeclared resource: aws_vpc.nonexistent"
+
+        result = classifier.classify(stderr, ["aws_subnet.private"])
+
+        assert result.error.error_type == TerraformErrorType.INVALID_REFERENCE
+        assert result.confidence == 0.95
+
+    def test_classify_dependency_violation(self):
+        """Test DEPENDENCY_VIOLATION pattern matching."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: DependencyViolation: Resource has dependencies that have not been created"
+
+        result = classifier.classify(stderr, ["aws_instance.web"])
+
+        assert result.error.error_type == TerraformErrorType.DEPENDENCY_VIOLATION
+        assert result.confidence == 0.95
+
+    def test_classify_unknown_error(self):
+        """Test UNKNOWN error for unmatched patterns."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: Some completely novel error that doesn't match any pattern"
+
+        result = classifier.classify(stderr, ["aws_something.unknown"])
+
+        assert result.error.error_type == TerraformErrorType.UNKNOWN
+        assert result.confidence == 0.0
+        assert result.classified_by == "unknown"
+        assert result.requires_user_input is True
+
+    def test_extract_line_number(self):
+        """Test line number extraction from error message."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error on main.tf line 42: Resource already exists"
+
+        result = classifier.classify(stderr, ["aws_eks_cluster.main"])
+
+        assert result.error.line_number == 42
+
+    def test_extract_affected_resource(self):
+        """Test affected resource extraction."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: AccessDenied"
+
+        result = classifier.classify(stderr, ["aws_iam_role.eks", "aws_iam_policy.example"])
+
+        assert result.error.affected_resource == "aws_iam_role.eks"
+
+    def test_failed_modules_extraction(self):
+        """Test failed modules are extracted from affected resources."""
+        classifier = TerraformErrorClassifier()
+        stderr = "Error: AccessDenied"
+
+        result = classifier.classify(stderr, ["aws_iam_role.eks", "aws_eks_cluster.main"])
+
+        assert "aws_iam_role.tf" in result.failed_modules
+        assert "aws_eks_cluster.tf" in result.failed_modules
+
+    def test_case_insensitive_matching(self):
+        """Test patterns are case insensitive."""
+        classifier = TerraformErrorClassifier()
+        stderr = "ERROR: RESOURCE ALREADY EXISTS"
+
+        result = classifier.classify(stderr, [])
+
+        assert result.error.error_type == TerraformErrorType.RESOURCE_ALREADY_EXISTS
+        assert result.confidence == 0.95
+
+    def test_multiple_pattern_keywords(self):
+        """Test error with multiple pattern keywords uses first match."""
+        classifier = TerraformErrorClassifier()
+        # This error has both "already exists" and "duplicate"
+        stderr = "Error: Resource already exists and is a duplicate"
+
+        result = classifier.classify(stderr, [])
+
+        # Should match RESOURCE_ALREADY_EXISTS (first pattern checked)
+        assert result.error.error_type == TerraformErrorType.RESOURCE_ALREADY_EXISTS
+        assert result.confidence == 0.95
+
+    def test_suggested_actions_are_actionable(self):
+        """Test suggested actions contain actionable steps."""
+        classifier = TerraformErrorClassifier()
+
+        # Test rate limit
+        result = classifier.classify("Error: Throttling", [])
+        assert len(result.suggested_actions) >= 2
+        assert any("wait" in action.lower() for action in result.suggested_actions)
+
+        # Test IAM permission
+        result = classifier.classify("Error: AccessDenied", [])
+        assert any("permission" in action.lower() for action in result.suggested_actions)
+
+    def test_confidence_threshold_for_classified_by(self):
+        """Test classified_by field matches confidence level."""
+        classifier = TerraformErrorClassifier()
+
+        # High confidence regex match
+        result = classifier.classify("Error: AccessDenied", [])
+        assert result.classified_by == "regex"
+
+        # Low confidence unknown
+        result = classifier.classify("Error: Something weird", [])
+        assert result.classified_by == "unknown"

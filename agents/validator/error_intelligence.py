@@ -217,8 +217,67 @@ class TerraformErrorClassifier:
     """
 
     def __init__(self):
-        # Will be populated in S3-03 with regex patterns
-        self.patterns = {}
+        import re
+
+        # 14 known regex patterns for fast classification (S3-03)
+        self.patterns = {
+            TerraformErrorType.RESOURCE_ALREADY_EXISTS: re.compile(
+                r"(already exists|AlreadyExistsException|ResourceAlreadyExists|duplicate|already been taken)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.RESOURCE_NOT_FOUND: re.compile(
+                r"(ResourceNotFoundException|NotFound|does not exist|cannot be found|InvalidParameterValue.*not found)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.RESOURCE_IN_USE: re.compile(
+                r"(ResourceInUseException|in use and cannot|cannot.*delete.*attached|cannot.*delete.*in use)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.IAM_PERMISSION_DENIED: re.compile(
+                r"(AccessDenied|UnauthorizedOperation|not authorized|Forbidden|InsufficientPermissions|iam:.*denied)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.IAM_INVALID_POLICY: re.compile(
+                r"(MalformedPolicyDocument|Invalid.*policy|PolicyDocumentInvalid|invalid JSON|syntax error in policy)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.SUBNET_CONFLICT: re.compile(
+                r"(subnet.*conflict|SubnetConflict|overlapping subnet|subnet.*already exists)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.CIDR_OVERLAP: re.compile(
+                r"(CIDR.*overlap|InvalidVpcRange|address space.*conflict|CIDR block.*invalid)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.SECURITY_GROUP_RULE_CONFLICT: re.compile(
+                r"(InvalidPermission\.Duplicate|security group rule.*exists|duplicate.*rule)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.QUOTA_EXCEEDED: re.compile(
+                r"(LimitExceeded|quota exceeded|exceeded.*limit|too many.*instances|maximum number)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.RATE_LIMIT: re.compile(
+                r"(Throttling|RequestLimitExceeded|rate.*exceeded|too many requests|429)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.INVALID_PARAMETER: re.compile(
+                r"(InvalidParameterValue|invalid.*value|ValidationException|unsupported.*type|invalid.*configuration)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.MISSING_REQUIRED_PARAMETER: re.compile(
+                r"(MissingParameter|missing.*required|required.*missing|argument.*required)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.INVALID_REFERENCE: re.compile(
+                r"(Reference to undeclared resource|invalid reference|unknown.*attribute|resource.*not found in state)",
+                re.IGNORECASE,
+            ),
+            TerraformErrorType.DEPENDENCY_VIOLATION: re.compile(
+                r"(DependencyViolation|circular.*dependency|depends.*not.*created|dependency.*failed)",
+                re.IGNORECASE,
+            ),
+        }
 
     def classify(self, stderr_output: str, affected_resources: List[str]) -> ErrorClassificationResult:
         """
@@ -231,26 +290,75 @@ class TerraformErrorClassifier:
         Returns:
             ErrorClassificationResult with typed error and fix guidance
         """
-        # Regex classification in S3-03
-        # LLM fallback in S3-04
+        # Try regex pattern matching first (S3-03)
+        error_type = None
+        confidence = 0.0
 
-        # For now, return UNKNOWN (will be implemented in S3-03)
+        for err_type, pattern in self.patterns.items():
+            if pattern.search(stderr_output):
+                error_type = err_type
+                confidence = 0.95  # High confidence for regex match
+                break
+
+        # Fall back to UNKNOWN if no pattern matches (will trigger LLM in S3-04)
+        if error_type is None:
+            error_type = TerraformErrorType.UNKNOWN
+            confidence = 0.0
+
+        # Extract line number if present
+        line_number = None
+        line_match = __import__('re').search(r'on (\w+\.tf) line (\d+)', stderr_output)
+        if line_match:
+            line_number = int(line_match.group(2))
+
+        # Build TerraformError
         error = TerraformError(
-            error_type=TerraformErrorType.UNKNOWN,
+            error_type=error_type,
             error_message=stderr_output[:500],  # Truncate for storage
             affected_resource=affected_resources[0] if affected_resources else None,
-            fix_hint=ERROR_FIX_HINTS[TerraformErrorType.UNKNOWN],
-            planner_instruction=PLANNER_INSTRUCTIONS[TerraformErrorType.UNKNOWN],
+            line_number=line_number,
+            fix_hint=ERROR_FIX_HINTS[error_type],
+            planner_instruction=PLANNER_INSTRUCTIONS[error_type],
         )
+
+        # Build suggested actions based on error type
+        suggested_actions = []
+        if error_type == TerraformErrorType.RATE_LIMIT:
+            suggested_actions = ["Wait 60 seconds", "Retry terraform operation"]
+        elif error_type == TerraformErrorType.RESOURCE_ALREADY_EXISTS:
+            suggested_actions = ["Use terraform import", "Rename resource with unique suffix"]
+        elif error_type == TerraformErrorType.IAM_PERMISSION_DENIED:
+            suggested_actions = ["Check IAM permissions", "Grant required permissions", "Reduce scope if over-permissioned"]
+        elif error_type == TerraformErrorType.QUOTA_EXCEEDED:
+            suggested_actions = ["Request quota increase", "Use different region", "Reduce resource count"]
+        elif error_type == TerraformErrorType.UNKNOWN:
+            suggested_actions = ["Analyze error manually", "Check Terraform documentation"]
+        else:
+            suggested_actions = ["Regenerate failed module", "Check error message for details"]
+
+        # Determine if user input is required
+        requires_user_input = error_type in [
+            TerraformErrorType.UNKNOWN,
+            TerraformErrorType.QUOTA_EXCEEDED,
+            TerraformErrorType.IAM_PERMISSION_DENIED,
+        ]
+
+        # Build failed modules list
+        failed_modules = []
+        if affected_resources:
+            # Extract module names from resource names (e.g., "aws_eks_cluster.main" -> "main.tf")
+            for resource in affected_resources:
+                # Assume module name matches resource prefix
+                failed_modules.append(f"{resource.split('.')[0]}.tf")
 
         return ErrorClassificationResult(
             error=error,
-            confidence=0.0,
-            failed_modules=[],
-            preserve_modules=[],
-            suggested_actions=["Analyze error manually"],
-            requires_user_input=True,
-            classified_by="stub",
+            confidence=confidence,
+            failed_modules=failed_modules,
+            preserve_modules=[],  # Will be determined by replanner in S3-05
+            suggested_actions=suggested_actions,
+            requires_user_input=requires_user_input,
+            classified_by="regex" if confidence > 0.5 else "unknown",
         )
 
 
