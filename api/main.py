@@ -222,6 +222,171 @@ async def approve_deployment(session_id: str):
     }
 
 
+@app.post("/sessions/{session_id}/output")
+async def generate_artifacts(session_id: str, output_mode: str = "artifacts"):
+    """
+    Generate infrastructure artifacts from confirmed IntentSpec.
+
+    This is the synchronous version that returns all artifacts at once.
+    For streaming progress updates, use /sessions/{session_id}/output/stream.
+
+    Args:
+        session_id: Session identifier
+        output_mode: Output mode (design/artifacts/deploy)
+
+    Returns:
+        Generated artifacts (Terraform, IAM, CI/CD)
+    """
+    from execution.output_router import create_output_router
+    from execution.executor import DAGExecutor
+    from agents.generators import (
+        create_terraform_generator,
+        create_iam_generator,
+        create_pipeline_generator,
+    )
+    from agents.finops import create_finops_scorer
+
+    # Check session exists
+    if not await state_store.session_exists(session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get confirmed IntentSpec
+    spec = await state_store.get_spec(session_id)
+
+    # Route to appropriate DAG
+    router = create_output_router()
+    try:
+        dag = router.route(spec, mode=output_mode)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Create agent registry
+    agents = {
+        "finops_score": create_finops_scorer(),
+        "infra_gen": create_terraform_generator(),
+        "iam_gen": create_iam_generator(),
+        "pipeline_gen": create_pipeline_generator(),
+    }
+
+    # Execute DAG
+    executor = DAGExecutor(agents=agents)
+    result = await executor.execute(dag, initial_context={"intent_spec": spec})
+
+    return {
+        "session_id": session_id,
+        "output_mode": output_mode,
+        "status": "success" if result.all_succeeded() else "partial_failure",
+        "artifacts": result.final_context,
+        "execution_time_seconds": result.total_duration_seconds,
+    }
+
+
+@app.get("/sessions/{session_id}/output/stream")
+async def stream_artifact_generation(session_id: str, output_mode: str = "artifacts"):
+    """
+    Stream artifact generation progress using Server-Sent Events (SSE).
+
+    Streams progress updates as each DAG node completes:
+    - Node start events
+    - Node completion events with outputs
+    - Error events
+    - Final completion event
+
+    Example:
+        GET /sessions/{id}/output/stream?output_mode=artifacts
+
+    Response format (text/event-stream):
+        event: node_start
+        data: {"node_id": "finops_score", "status": "running"}
+
+        event: node_complete
+        data: {"node_id": "finops_score", "output": {...}, "duration": 2.5}
+
+        event: complete
+        data: {"status": "success", "total_duration": 45.2}
+    """
+    from fastapi.responses import StreamingResponse
+    from execution.output_router import create_output_router
+    from execution.executor import DAGExecutor
+    from agents.generators import (
+        create_terraform_generator,
+        create_iam_generator,
+        create_pipeline_generator,
+    )
+    from agents.finops import create_finops_scorer
+    import asyncio
+    import time
+
+    # Check session exists
+    if not await state_store.session_exists(session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get confirmed IntentSpec
+    spec = await state_store.get_spec(session_id)
+
+    # Route to appropriate DAG
+    router = create_output_router()
+    try:
+        dag = router.route(spec, mode=output_mode)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Create agent registry
+    agents = {
+        "finops_score": create_finops_scorer(),
+        "infra_gen": create_terraform_generator(),
+        "iam_gen": create_iam_generator(),
+        "pipeline_gen": create_pipeline_generator(),
+    }
+
+    async def event_generator():
+        """Generate SSE events as DAG executes."""
+        try:
+            # Send start event
+            yield f"event: start\\ndata: {json.dumps({'session_id': session_id, 'output_mode': output_mode})}\\n\\n"
+
+            executor = DAGExecutor(agents=agents)
+            start_time = time.time()
+
+            # Execute DAG
+            result = await executor.execute(dag, initial_context={"intent_spec": spec})
+
+            # Send node completion events
+            for node_id, node in dag.nodes.items():
+                node_output = result.final_context.get(f"{node_id}_output", {})
+                event_data = {
+                    "node_id": node_id,
+                    "status": node.status.value,
+                    "output_keys": list(node_output.keys()) if isinstance(node_output, dict) else [],
+                }
+                yield f"event: node_complete\\ndata: {json.dumps(event_data)}\\n\\n"
+                await asyncio.sleep(0.1)  # Small delay for client buffering
+
+            # Send completion event
+            completion_data = {
+                "status": "success" if result.all_succeeded() else "partial_failure",
+                "total_duration": time.time() - start_time,
+                "completed_nodes": len([n for n in dag.nodes.values() if n.status.value == "completed"]),
+                "failed_nodes": len([n for n in dag.nodes.values() if n.status.value == "failed"]),
+            }
+            yield f"event: complete\\ndata: {json.dumps(completion_data)}\\n\\n"
+
+        except Exception as e:
+            # Send error event
+            error_data = {"error": str(e), "type": type(e).__name__}
+            yield f"event: error\\ndata: {json.dumps(error_data)}\\n\\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 
