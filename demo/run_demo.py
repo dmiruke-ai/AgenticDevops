@@ -51,11 +51,23 @@ def print_section(title: str, description: str):
 """)
 
 
+def wait_for_user(message: str, interactive: bool = True):
+    """Wait for user input if interactive, otherwise just pause briefly."""
+    if interactive and sys.stdin.isatty():
+        input(message)
+    else:
+        # Non-interactive mode: just print a separator
+        print(f"\n  {'─' * 60}\n")
+
+
 async def main(mock_mode: bool = False):
     """Run all demo scenarios."""
     print_banner()
 
-    print(f"\n  Mode: {'🔸 MOCK (no external services)' if mock_mode else '🔹 LIVE (with services)'}\n")
+    # Determine if we're running interactively
+    interactive = sys.stdin.isatty() and not mock_mode
+
+    print(f"\n  Mode: {'MOCK (no external services)' if mock_mode else 'LIVE (with services)'}\n")
 
     # Scenario 1: Intent → Infrastructure
     print_section(
@@ -64,7 +76,7 @@ async def main(mock_mode: bool = False):
     )
     await run_scenario_1(mock_mode=mock_mode)
 
-    input("\n  Press Enter to continue to Scenario 2...")
+    wait_for_user("\n  Press Enter to continue to Scenario 2...", interactive)
 
     # Scenario 2: Error Handling
     print_section(
@@ -73,7 +85,7 @@ async def main(mock_mode: bool = False):
     )
     await run_scenario_2(mock_mode=mock_mode)
 
-    input("\n  Press Enter to continue to Scenario 3...")
+    wait_for_user("\n  Press Enter to continue to Scenario 3...", interactive)
 
     # Scenario 3: FinOps
     print_section(

@@ -11,8 +11,9 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-import instructor
-from anthropic import Anthropic
+
+# instructor and anthropic are imported lazily in TerraformErrorClassifier
+# to allow using the enum and models without those dependencies
 
 
 class TerraformErrorType(str, Enum):
@@ -298,9 +299,19 @@ class TerraformErrorClassifier:
         }
 
         # Initialize instructor client for LLM fallback (S3-04)
-        from config import config
-        self.client = instructor.from_anthropic(Anthropic(api_key=config.anthropic_api_key))
-        self.classifier_model = config.classifier_model
+        # Import lazily to allow using enums/models without these dependencies
+        # Optional - tests can run without instructor/anthropic installed
+        self.client = None
+        self.classifier_model = None
+        try:
+            import instructor
+            from anthropic import Anthropic
+            from config import config
+            self.client = instructor.from_anthropic(Anthropic(api_key=config.anthropic_api_key))
+            self.classifier_model = config.classifier_model
+        except ImportError:
+            # LLM fallback will not be available, but regex classification still works
+            pass
 
     def _classify_with_llm(self, stderr_output: str, affected_resource: Optional[str]) -> LLMClassificationOutput:
         """
@@ -315,6 +326,17 @@ class TerraformErrorClassifier:
         Returns:
             LLMClassificationOutput with structured classification
         """
+        # If instructor client not available, return UNKNOWN classification
+        if self.client is None:
+            return LLMClassificationOutput(
+                error_type=TerraformErrorType.UNKNOWN,
+                confidence=0.0,
+                fix_hint="LLM fallback not available (instructor not installed)",
+                planner_instruction="Manual review required",
+                failed_module="unknown",
+                requires_user_input=True,
+            )
+
         # PROMPT_CHAIN_03: Terraform Error Classification
         system_prompt = """You are a Terraform Error Classification Engine.
 Your job is to classify a raw Terraform error into a structured error object.

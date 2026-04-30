@@ -6,13 +6,13 @@ Only regenerates failing modules, preserves passing modules.
 """
 
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from pydantic import BaseModel, Field
-import instructor
-from anthropic import Anthropic
 
-from config import AgentConfig
 from agents.validator.error_intelligence import ErrorClassificationResult
+
+# config, instructor and anthropic are imported lazily in SmartReplanner.__init__
+# to allow using models without those dependencies
 
 
 class ReplanningInput(BaseModel):
@@ -86,9 +86,19 @@ class SmartReplanner:
 
     def __init__(self):
         """Initialize SmartReplanner with Anthropic client."""
-        config = AgentConfig()
-        self.model = config.primary_model
-        self.client = instructor.from_anthropic(Anthropic())
+        self.model = "claude-sonnet-4-20250514"  # Default model
+        self.client = None
+        # Lazy import to allow tests to run without dependencies
+        try:
+            from config import AgentConfig
+            config = AgentConfig()
+            self.model = config.primary_model
+
+            import instructor
+            from anthropic import Anthropic
+            self.client = instructor.from_anthropic(Anthropic())
+        except ImportError:
+            pass
 
     def replan(self, input_data: ReplanningInput) -> ReplanningOutput:
         """
@@ -102,10 +112,13 @@ class SmartReplanner:
 
         Raises:
             ValueError: If no failing modules specified
-            instructor.exceptions.InstructorRetryException: If LLM output invalid
+            RuntimeError: If instructor client not available
         """
         if not input_data.failing_modules:
             raise ValueError("No failing modules specified for replanning")
+
+        if self.client is None:
+            raise RuntimeError("SmartReplanner requires instructor and anthropic packages")
 
         prompt = self._build_prompt(input_data)
 

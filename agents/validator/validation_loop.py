@@ -33,13 +33,9 @@ from agents.validator.error_intelligence import (
     build_planner_context,
     create_error_classifier,
 )
-from agents.planner.smart_replanner import (
-    SmartReplanner,
-    ReplanningInput,
-    ReplanningOutput,
-    create_smart_replanner,
-)
-from config import AgentConfig
+
+# Lazy imports for modules with external dependencies
+# SmartReplanner, config imported on demand to avoid dependency issues
 
 
 class ValidationResult(BaseModel):
@@ -194,13 +190,18 @@ class ValidationLoop:
             max_retries: Maximum retry attempts (default: 3)
             skip_terraform: Skip actual terraform commands (for testing)
         """
-        config = AgentConfig()
         self.max_retries = max_retries
         self.skip_terraform = skip_terraform
 
         # Initialize components
         self.classifier = create_error_classifier()
-        self.replanner = create_smart_replanner()
+        self.replanner = None
+        # Lazy import to avoid dependency issues
+        try:
+            from agents.planner.smart_replanner import create_smart_replanner
+            self.replanner = create_smart_replanner()
+        except ImportError:
+            pass
 
     async def validate_and_fix(
         self,
@@ -329,7 +330,7 @@ class ValidationLoop:
         terraform_files: Dict[str, str],
         intent_spec: Dict[str, Any],
         retry_count: int,
-    ) -> ReplanningOutput:
+    ):
         """
         Attempt smart replanning for classified error.
 
@@ -341,7 +342,16 @@ class ValidationLoop:
 
         Returns:
             ReplanningOutput with fixed modules
+
+        Raises:
+            RuntimeError: If replanner not available
         """
+        # Lazy import
+        from agents.planner.smart_replanner import ReplanningInput
+
+        if self.replanner is None:
+            raise RuntimeError("SmartReplanner not available (missing dependencies)")
+
         # Determine passing vs failing modules
         failing_modules = classification.failed_modules or ["main"]
 
