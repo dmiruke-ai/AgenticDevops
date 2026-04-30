@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # OPA Policy Server with Dynamic Policy Updates
+  # ==========================================================================
+  opa:
+    image: openpolicyagent/opa:latest
+    container_name: devops-agent-opa
+    ports:
+      - "8182:8181"  # OPA API (avoid conflict with inferloop on 8181)
+    volumes:
+      - ./security/policies:/policies:ro  # Read-only mount
+      - ./security/bundles:/bundles       # For bundle-based updates
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--watch"                         # Auto-reload on file changes
+      - "--log-level=info"
+      - "--log-format=json"
+      - "/policies"
+    environment:
+      - OPA_LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - devops-network
+
+  # ==========================================================================
+  # Redis - State Store for IntentSpec
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: devops-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - devops-network
+
+  # ==========================================================================
+  # FastAPI Application
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devops-agent-api
+    ports:
+      - "8000:8000"
+    environment:
+      - OPA_URL=http://opa:8181
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OTLP_ENDPOINT=http://jaeger:4317
+    volumes:
+      - ./:/app:ro  # Read-only for security
+      - /var/run/docker.sock:/var/run/docker.sock  # For terraform runner
+    depends_on:
+      - opa
+      - redis
+    restart: unless-stopped
+    networks:
+      - devops-network
+
+  # ==========================================================================
+  # Prometheus - Metrics Collection
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: devops-agent-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - devops-network
+
+  # ==========================================================================
+  # Jaeger - Distributed Tracing
+  # ==========================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: devops-agent-jaeger
+    ports:
+      - "16686:16686"  # Web UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+    networks:
+      - devops-network
+
+  # ==========================================================================
+  # Policy Admin Service (for dynamic updates)
+  # ==========================================================================
+  policy-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.policy-admin
+    container_name: devops-agent-policy-admin
+    ports:
+      - "8183:8183"
+    environment:
+      - OPA_URL=http://opa:8181
+    volumes:
+      - ./security/policies:/policies        # Read-write for updates
+      - ./security/policy-versions:/versions # Version history
+    depends_on:
+      - opa
+    restart: unless-stopped
+    networks:
+      - devops-network
+
+networks:
+  devops-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:

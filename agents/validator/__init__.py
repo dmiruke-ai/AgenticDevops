@@ -8,9 +8,18 @@ from agents.validator.error_intelligence import (
     create_error_classifier,
     ERROR_FIX_HINTS,
     PLANNER_INSTRUCTIONS,
+    build_planner_context,
+)
+
+from agents.validator.validation_loop import (
+    ValidationLoop,
+    ValidationResult,
+    TerraformRunner,
+    create_validation_loop,
 )
 
 __all__ = [
+    # Error Intelligence
     "TerraformErrorType",
     "TerraformError",
     "ErrorClassificationResult",
@@ -18,4 +27,10 @@ __all__ = [
     "create_error_classifier",
     "ERROR_FIX_HINTS",
     "PLANNER_INSTRUCTIONS",
+    "build_planner_context",
+    # Validation Loop
+    "ValidationLoop",
+    "ValidationResult",
+    "TerraformRunner",
+    "create_validation_loop",
 ]

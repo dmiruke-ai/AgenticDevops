@@ -492,3 +492,128 @@ OUTPUT (strict JSON with the fields in LLMClassificationOutput):"""
 def create_error_classifier() -> TerraformErrorClassifier:
     """Factory function for creating TerraformErrorClassifier."""
     return TerraformErrorClassifier()
+
+
+def build_planner_context(result: ErrorClassificationResult) -> str:
+    """
+    Build structured context string for smart replanner (S3-05).
+
+    Serializes ErrorClassificationResult into a clear, LLM-friendly format
+    that describes what failed and how to fix it.
+
+    Args:
+        result: Classification result from TerraformErrorClassifier
+
+    Returns:
+        Structured text describing the error, affected modules, and fix guidance
+
+    Example output:
+        ```
+        TERRAFORM VALIDATION FAILED
+        ===========================
+
+        ERROR TYPE: IAM_PERMISSION_DENIED
+        AFFECTED RESOURCE: aws_iam_role.eks_cluster
+        CLASSIFICATION CONFIDENCE: 0.95
+
+        ERROR MESSAGE:
+        AccessDenied: User is not authorized to perform: iam:CreateRole
+
+        FIX HINT:
+        Grant IAM CreateRole permission to the executing user/role
+
+        PLANNER INSTRUCTION:
+        Regenerate IAM module with narrower scope or use existing role
+
+        FAILED MODULES:
+        - iam
+
+        PRESERVE MODULES (do not regenerate):
+        - network
+        - compute
+
+        SUGGESTED ACTIONS:
+        1. Grant IAM CreateRole permission
+        2. Use existing IAM role
+
+        [!] USER INPUT REQUIRED
+        ```
+    """
+    error = result.error
+    lines = []
+
+    # Header
+    lines.append("=" * 60)
+    lines.append("TERRAFORM VALIDATION FAILED")
+    lines.append("=" * 60)
+    lines.append("")
+
+    # Error identification
+    lines.append(f"ERROR TYPE: {error.error_type.name}")
+
+    if error.affected_resource:
+        lines.append(f"AFFECTED RESOURCE: {error.affected_resource}")
+    else:
+        lines.append("AFFECTED RESOURCE: Not specified")
+
+    if error.line_number:
+        lines.append(f"LINE NUMBER: {error.line_number}")
+
+    lines.append(f"CLASSIFICATION CONFIDENCE: {result.confidence:.2f}")
+    lines.append(f"CLASSIFIED BY: {result.classified_by}")
+    lines.append("")
+
+    # Error message
+    lines.append("ERROR MESSAGE:")
+    lines.append("-" * 60)
+    # Indent multi-line error messages
+    error_lines = error.error_message.strip().split('\n')
+    for err_line in error_lines:
+        lines.append(f"  {err_line.strip()}")
+    lines.append("-" * 60)
+    lines.append("")
+
+    # Fix guidance
+    lines.append("FIX HINT:")
+    lines.append(f"  {error.fix_hint}")
+    lines.append("")
+
+    lines.append("PLANNER INSTRUCTION:")
+    lines.append(f"  {error.planner_instruction}")
+    lines.append("")
+
+    # Module information
+    if result.failed_modules:
+        lines.append("FAILED MODULES (regenerate these):")
+        for module in result.failed_modules:
+            lines.append(f"  - {module}")
+        lines.append("")
+
+    if result.preserve_modules:
+        lines.append("PRESERVE MODULES (do NOT regenerate):")
+        for module in result.preserve_modules:
+            lines.append(f"  - {module}")
+        lines.append("")
+
+    # Suggested actions
+    if result.suggested_actions:
+        lines.append("SUGGESTED ACTIONS:")
+        for i, action in enumerate(result.suggested_actions, 1):
+            lines.append(f"  {i}. {action}")
+        lines.append("")
+
+    # Flags
+    if result.requires_user_input:
+        lines.append("╔════════════════════════════════════════════════╗")
+        lines.append("║  [!] USER INPUT REQUIRED                       ║")
+        lines.append("║  This error cannot be auto-fixed.              ║")
+        lines.append("║  System will escalate to user for resolution.  ║")
+        lines.append("╔════════════════════════════════════════════════╗")
+        lines.append("")
+
+    # Footer
+    lines.append("=" * 60)
+    lines.append(f"Retry count for this error: {error.retry_count}")
+    lines.append("=" * 60)
+
+    return '\n'.join(lines)
