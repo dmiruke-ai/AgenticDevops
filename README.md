@@ -1,249 +1,306 @@
 # AI DevOps Agent Platform
 
-**Intent-driven infrastructure generation with LangGraph multi-agent orchestration**
+> **Transform natural language into production-ready cloud infrastructure**
 
-A production-ready AI agent system that transforms natural language conversations into validated, secure cloud infrastructure. Uses confidence-aware intent tracking, OPA security gates, and smart validation loops to prevent errors before deployment.
+An AI-powered multi-agent system that converts conversational intent into validated Terraform, CI/CD pipelines, and IAM policies. Features confidence-aware intent tracking, OPA security gates, Tree-of-Thought architecture evaluation, and smart error recovery.
 
-## 🎯 Core Principles
+[![Tests](https://img.shields.io/badge/tests-426%20passed-brightgreen)]()
+[![Python](https://img.shields.io/badge/python-3.11+-blue)]()
+[![License](https://img.shields.io/badge/license-MIT-green)]()
 
-- **Intent-First**: Builds a canonical `IntentSpec` from conversation with confidence tracking
-- **Never Execute on Uncertainty**: Blocks irreversible actions on `speculative` or `inferred` intent
-- **Security at Intent Layer**: OPA policies prevent vulnerabilities before code generation
-- **Smart Error Recovery**: Typed error classification with targeted replanning, not naive retry
-- **Human-in-the-Loop**: Approval gate for destructive operations with blast radius analysis
+---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-User Message → Intent Parser → IntentSpec (confidence bands)
-                    ↓
-                FinOps Scorer (Tree-of-Thought platform eval)
-                    ↓
-                Planner (DAG-based artifact generation)
-                    ↓
-                Validator (Terraform plan + error intelligence)
-                    ↓
-             Approval Gate (blast radius + cost delta)
-                    ↓
-                Executor (terraform apply)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         AI DevOps Agent Platform                            │
+│                                                                             │
+│  "Deploy a scalable web app on AWS with CI/CD"                             │
+│                              │                                              │
+│                              ▼                                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                     │
+│  │   Intent    │───▶│  Conflict   │───▶│    OPA      │                     │
+│  │   Parser    │    │  Detector   │    │  Security   │                     │
+│  └─────────────┘    └─────────────┘    └─────────────┘                     │
+│         │                                     │                             │
+│         ▼                                     ▼                             │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │              IntentSpec (Canonical Intent)                   │           │
+│  │  • Confidence: stated | confirmed | inferred | speculative  │           │
+│  │  • Categories: task | meta | constraint                      │           │
+│  └─────────────────────────────────────────────────────────────┘           │
+│                              │                                              │
+│         ┌────────────────────┼────────────────────┐                        │
+│         ▼                    ▼                    ▼                        │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                     │
+│  │   FinOps    │    │  Terraform  │    │   CI/CD     │                     │
+│  │   Scorer    │    │  Generator  │    │  Generator  │                     │
+│  │   (ToT)     │    └─────────────┘    └─────────────┘                     │
+│  └─────────────┘           │                                               │
+│                            ▼                                               │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │  Validation Loop (Error → Classify → Fix → Regenerate)      │           │
+│  └─────────────────────────────────────────────────────────────┘           │
+│                              │                                              │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────┐           │
+│  │  Approval Gate (Blast Radius + Cost Delta + Human Decision) │           │
+│  └─────────────────────────────────────────────────────────────┘           │
+│                              │                                              │
+│                              ▼                                              │
+│                     [Terraform Apply]                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Components
+---
 
-- **IntentSpec**: Canonical intent representation with 4 confidence bands
-- **Confidence State Machine**: Governs transitions from `speculative` → `inferred` → `confirmed` → `stated`
-- **DAG Executor**: Dependency-aware topological execution with true async parallelism
-- **OPA Security Layer**: Blocks wildcard IAM, open security groups, unencrypted storage at intent level
-- **Error Intelligence**: 15 typed Terraform errors with structured fix hints
+## Key Features
 
-## 🚀 Quick Start
+| Feature | Description |
+|---------|-------------|
+| **Confidence Tracking** | 4-band confidence system prevents execution on uncertain intent |
+| **OPA Security** | Blocks wildcard IAM, open security groups, prompt injection at intent layer |
+| **Smart Replanning** | 15 error types with targeted fixes, not naive retry |
+| **FinOps Scoring** | Tree-of-Thought evaluation of EKS vs ECS vs Lambda vs EC2 |
+| **Human Approval** | Blast radius calculation + cost delta before destructive operations |
+| **Multi-Tenant** | Session isolation ensures Tenant A cannot access Tenant B |
+| **Full Observability** | 30+ Prometheus metrics, Jaeger traces, Grafana dashboards |
+
+---
+
+## Quick Demo
+
+```bash
+# Clone and setup
+git clone https://github.com/mirdattamir/AgenticDevops.git
+cd AgenticDevops
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# Run demo (no external services needed)
+make demo-quick
+```
+
+### Demo Scenarios
+
+| Scenario | Description |
+|----------|-------------|
+| **1. Intent → Infra** | Natural language to Terraform + CI/CD |
+| **2. Error Handling** | Inject error → Classify → Smart replan |
+| **3. FinOps Analysis** | Tree-of-Thought cost optimization |
+
+```bash
+# Run individual scenarios
+make demo-scenario-1   # Intent → Infrastructure
+make demo-scenario-2   # Error handling
+make demo-scenario-3   # FinOps optimization
+
+# Full demo with services
+make demo-up           # Starts Docker + runs all scenarios
+make demo-down         # Stop services
+```
+
+---
+
+## Installation
 
 ### Prerequisites
 
 - Python 3.11+
 - Docker & Docker Compose
-- Git
+- OPA CLI (for policy testing)
 
-### Installation
+### Setup
 
 ```bash
-# Clone repository
-git clone <repo-url>
-cd AgenticDevops
-
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+make install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your API keys
-```
+# Edit .env with your API keys (ANTHROPIC_API_KEY, etc.)
 
-### Run with Docker Compose
-
-```bash
-# Start all services (FastAPI, Redis, OPA, Prometheus, Jaeger)
-cd docker
-docker-compose up -d
-
-# View logs
-docker-compose logs -f api
-
-# Stop services
-docker-compose down
+# Start all services
+make demo-up
 ```
 
 ### Services
 
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Metrics**: http://localhost:8000/metrics
-- **Jaeger UI**: http://localhost:16686
-- **Prometheus**: http://localhost:9090
+| Service | URL | Purpose |
+|---------|-----|---------|
+| API | http://localhost:8000 | Main FastAPI application |
+| Docs | http://localhost:8000/docs | OpenAPI documentation |
+| Jaeger | http://localhost:16686 | Distributed traces |
+| Prometheus | http://localhost:9090 | Metrics |
+| Grafana | http://localhost:3000 | Dashboards |
 
-## 🧪 Testing
+---
+
+## How It Works
+
+### 1. Intent Parsing
+
+```
+User: "Deploy a scalable web app on AWS with EKS and CI/CD"
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│  IntentSpec                                             │
+│  ├── cloud_provider: AWS [STATED]                       │
+│  ├── compute_platform: EKS [STATED]                     │
+│  ├── ci_cd: GitHub Actions [INFERRED]                   │
+│  └── region: us-east-1 [SPECULATIVE]                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2. Security Check (OPA)
+
+```
+✓ No wildcard IAM detected
+✓ No open security groups (0.0.0.0/0)
+✓ No prompt injection patterns
+✓ Intent structure valid
+→ ALLOWED
+```
+
+### 3. Generation + Validation
+
+```
+Generate Terraform → Validate → Error?
+                                  │
+                    ┌─────────────┴─────────────┐
+                    ▼                           ▼
+               [No Error]              [Error Detected]
+                    │                           │
+                    ▼                           ▼
+              Approval Gate         Classify (15 types)
+                                            │
+                                            ▼
+                                    Smart Replan
+                                            │
+                                            ▼
+                                    Regenerate (targeted)
+```
+
+### 4. Human Approval
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  APPROVAL REQUIRED                                       │
+│                                                          │
+│  Blast Radius:                                           │
+│  • Create: 12 resources                                  │
+│  • Delete: 2 resources ⚠️                               │
+│  • Risk Level: HIGH                                      │
+│                                                          │
+│  Cost Delta: +$100/month (+67%)                          │
+│                                                          │
+│  [APPROVE]  [REJECT]            Timeout: 5 minutes       │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Testing
 
 ```bash
-# Run all tests
-pytest
+# Run all tests (426 tests)
+make test
 
-# Run with coverage
-pytest --cov=agents --cov=intent --cov=execution --cov-report=html
+# Run specific suites
+make test-unit          # Unit tests
+make test-adversarial   # OPA prompt injection tests
 
-# Run specific test suite
-pytest tests/unit/
-pytest tests/integration/
-pytest tests/adversarial/
-
-# Run single test
-pytest tests/unit/test_intent_schema.py::TestIntentSpec::test_create_empty_intent_spec -v
+# With coverage
+make test-coverage
 ```
 
-## 📋 Development
+---
 
-### Code Quality
-
-```bash
-# Lint with Ruff
-ruff check .
-
-# Format with Ruff
-ruff format .
-
-# Type check with MyPy
-mypy agents/ intent/ execution/ security/ gates/ observability/ api/
-```
-
-### Project Structure
+## Project Structure
 
 ```
-agents/
-  intent_parser/     # Semantic extraction, dialogue policy
-  planner/           # Smart replanning after validation errors
-  generators/        # Terraform, IAM, CI/CD YAML
-  finops/           # FinOps scoring (Tree-of-Thought)
-  validator/        # Error intelligence, terraform runner
-
-intent/
-  schema.py         # IntentSpec Pydantic models
-  confidence.py     # State machine, transitions, gates
-  conflict_detector.py  # 8 DevOps conflict patterns
-
-execution/
-  dag.py           # Topological DAG executor
-
-security/
-  opa_intent_gate.py   # Python OPA client
-  policies/           # Rego policy bundle
-
-gates/
-  human_approval.py    # Approval gate for terraform apply
-
-observability/
-  agent_tracer.py      # OpenTelemetry + Prometheus
-
-api/
-  main.py             # FastAPI application
+AgenticDevops/
+├── agents/
+│   ├── intent_parser/     # Semantic extraction
+│   ├── planner/           # Smart replanning (CoT)
+│   ├── generators/        # Terraform, IAM, CI/CD
+│   ├── finops/            # FinOps scoring (ToT)
+│   └── validator/         # Error intelligence
+├── intent/
+│   ├── schema.py          # IntentSpec models
+│   ├── confidence.py      # State machine
+│   └── session_manager.py # Multi-tenant sessions
+├── security/
+│   ├── opa_intent_gate.py # Python OPA client
+│   └── policies/          # Rego policies
+├── gates/
+│   └── human_approval.py  # Approval gate
+├── observability/
+│   └── agent_tracer.py    # OpenTelemetry + Prometheus
+├── demo/                  # Demo scripts
+├── dashboards/            # Grafana JSON
+└── architecture/          # Architecture docs
 ```
 
-## 📊 Sprint Status
+---
 
-### ✅ Sprint 0 - Foundation (COMPLETED)
+## Sprint Status
 
-- [x] Repository structure
-- [x] Docker Compose with all services
-- [x] GitHub Actions CI pipeline
-- [x] Base IntentSpec Pydantic models
-- [x] Observability tracer decorator
-- [x] Stub LangGraph nodes
-- [x] Unit tests for IntentSpec
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| Sprint 0 | Foundation | ✅ Complete |
+| Sprint 1 | Intent Engine | ✅ Complete |
+| Sprint 2 | DAG + FinOps + Generators | ✅ Complete |
+| Sprint 3 | Validation + Security | ✅ Complete |
+| Sprint 4 | Observability + HITL | ✅ Complete |
 
-### 🔄 Sprint 1 - Intent Engine Core (IN PROGRESS)
+**Total: 426 tests passing**
 
-Implements:
-- IntentTransitionEngine (6 confidence transition paths)
-- ConflictDetector (8 DevOps conflict patterns)
-- Semantic Extractor (PROMPT_CHAIN_01)
-- Dialogue Policy (PROMPT_CHAIN_02)
-- Session state store (Redis)
+---
 
-### 📅 Sprint 2 - DAG + FinOps + Artifact Generation
+## Documentation
 
-Implements:
-- IntentDAG with topological sort
-- DAGExecutor with async parallelism
-- FinOps scoring (Tree-of-Thought)
-- Terraform generator
-- IAM policy generator
-- CI/CD pipeline generator
+| Document | Description |
+|----------|-------------|
+| [Architecture](architecture/ARCHITECTURE.md) | System design and data flow |
+| [FinOps Analysis](docs/FINOPS_ANALYSIS.md) | Cost optimization guide |
+| [Sprint 3 Summary](docs/SPRINT_3_SUMMARY.md) | Validation + Security |
+| [Sprint 4 Summary](docs/SPRINT_4_SUMMARY.md) | Observability + HITL |
+| [CLAUDE.md](CLAUDE.md) | AI assistant guidance |
 
-### 📅 Sprint 3 - Validation Loop + Security
+---
 
-Implements:
-- Terraform error intelligence (15 error types)
-- Smart replanning with targeted fixes
-- OPA security layer
-- Adversarial test suite (prompt injection)
-
-### 📅 Sprint 4 - Observability + HITL + Hardening
-
-Implements:
-- Full OpenTelemetry instrumentation
-- Grafana dashboard
-- Approval gate with blast radius
-- Multi-tenancy isolation
-- Load testing
-
-## 🔒 Security
+## Security
 
 ### OPA Policies (Intent Layer)
 
-Blocks at intent extraction (before code generation):
-- ✋ Wildcard IAM policies (`*`)
-- ✋ Open security groups (`0.0.0.0/0`)
-- ✋ Unencrypted storage
-- ✋ Public S3 buckets
-- ⚠️  Production without MFA (warning)
+| Policy | Action |
+|--------|--------|
+| Wildcard IAM (`*`) | BLOCK |
+| Open security groups (0.0.0.0/0) | BLOCK (except 80/443) |
+| Prompt injection (15 patterns) | BLOCK |
+| Invalid intent structure | BLOCK |
 
 ### Confidence-Based Execution
 
 | Action | Minimum Confidence |
 |--------|-------------------|
-| `generate_terraform` | `confirmed` |
-| `terraform_apply` | `confirmed` + human approval |
-| `delete_resource` | `confirmed` + human approval |
-| `modify_iam` | `confirmed` |
-
-## 📖 Documentation
-
-- **Implementation Handoff**: `ai_devops_agent_implementation_handoff.md`
-- **CLAUDE.md**: Guidance for Claude Code instances
-- **Component Specs**: See handoff document PART 1 (SPEC-01 through SPEC-06)
-- **Prompt Chains**: See handoff document PART 2 (PROMPT_CHAIN_01 through PROMPT_CHAIN_06)
-
-## 🤝 Contributing
-
-This project follows TDD (Test-Driven Development):
-
-1. Write tests that validate acceptance criteria
-2. Implement minimal code to pass tests
-3. Refactor
-4. Submit PR with passing CI
-
-## 📄 License
-
-[Specify license]
-
-## 🙏 Acknowledgments
-
-Built on the `intentctl` library pattern for confidence-aware intent specification.
+| Generate Terraform | `confirmed` |
+| Terraform Apply | `confirmed` + approval |
+| Delete Resources | `confirmed` + approval |
 
 ---
 
-**Status**: Sprint 0 Complete ✅ | Sprint 1 In Progress 🔄
+## License
 
-For detailed sprint plans and acceptance criteria, see the implementation handoff document.
+MIT License - See [LICENSE](LICENSE) for details.
+
+---
+
+**Built with**: LangGraph, FastAPI, Terraform, OPA, OpenTelemetry, Prometheus, Grafana
