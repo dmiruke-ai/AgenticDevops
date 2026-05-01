@@ -1,0 +1,9 @@
+# Netlify configuration for AI DevOps Agent demo site
+
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"

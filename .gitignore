@@ -60,5 +60,13 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
 # Project specific
 *.pdf

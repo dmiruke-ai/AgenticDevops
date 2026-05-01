@@ -4,9 +4,61 @@
 
 An AI-powered multi-agent system that converts conversational intent into validated Terraform, CI/CD pipelines, and IAM policies. Features confidence-aware intent tracking, OPA security gates, Tree-of-Thought architecture evaluation, and smart error recovery.
 
-[![Tests](https://img.shields.io/badge/tests-426%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-70%20passed-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.11+-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
+
+---
+
+## Try It Now
+
+```bash
+git clone https://github.com/mirdattamir/AgenticDevops.git && cd AgenticDevops
+python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+make demo-quick   # Runs in < 2 minutes, no Docker required
+```
+
+<details>
+<summary><b>Preview: What You'll See</b> (click to expand)</summary>
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║     █████╗ ██╗    ██████╗ ███████╗██╗   ██╗ ██████╗ ██████╗ ███████╗        ║
+║    ██╔══██╗██║    ██╔══██╗██╔════╝██║   ██║██╔═══██╗██╔══██╗██╔════╝        ║
+║    ███████║██║    ██║  ██║█████╗  ██║   ██║██║   ██║██████╔╝███████╗        ║
+║    ██╔══██║██║    ██║  ██║██╔══╝  ╚██╗ ██╔╝██║   ██║██╔═══╝ ╚════██║        ║
+║    ██║  ██║██║    ██████╔╝███████╗ ╚████╔╝ ╚██████╔╝██║     ███████║        ║
+║              AI-Powered Infrastructure from Natural Language                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+SCENARIO 1: Intent → Infrastructure
+  ┌─ User: "Deploy a scalable web app on AWS with EKS and CI/CD"
+  │
+  │  IntentSpec:
+  │    ● cloud_provider: AWS [stated]
+  │    ● compute_platform: EKS [stated]
+  │    ○ region: us-east-1 [inferred]
+  │
+  │  OPA Security: ✓ ALLOWED
+  │  Generated: main.tf, vpc.tf, .github/workflows/deploy.yml
+  └─ ✓ COMPLETE
+
+SCENARIO 2: Error Handling
+  ┌─ Error: INVALID_REFERENCE (aws_security_group.missing)
+  │  Classification: Automatic (1 of 15 types)
+  │  Fix: Create missing security group
+  └─ ✓ Fixed in 1 replan attempt
+
+SCENARIO 3: FinOps Analysis
+  ┌─ Budget: $100/month
+  │  Evaluated: Lambda, ECS, EKS, EC2
+  │  Recommendation: Lambda + API Gateway ($11.50/mo)
+  └─ ✓ 88% under budget
+```
+
+[Full demo preview with screenshots →](docs/DEMO_PREVIEW.md)
+
+</details>
 
 ---
 
@@ -69,37 +121,76 @@ An AI-powered multi-agent system that converts conversational intent into valida
 
 ---
 
-## Quick Demo
+## Quick Demo (< 2 minutes)
+
+### Option 1: Instant Demo (No Docker Required)
 
 ```bash
-# Clone and setup
+# Clone repository
 git clone https://github.com/mirdattamir/AgenticDevops.git
 cd AgenticDevops
-python -m venv venv && source venv/bin/activate
+
+# Setup Python environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Run demo (no external services needed)
+# Run demo - shows all 3 scenarios instantly
 make demo-quick
+```
+
+**What you'll see:**
+1. **Intent → Infrastructure**: Natural language converted to Terraform + CI/CD
+2. **Error Handling**: Terraform error → classification → smart replan → fix
+3. **FinOps Analysis**: Tree-of-Thought cost comparison (Lambda vs EKS vs ECS)
+
+### Option 2: Full Stack Demo (Docker Required)
+
+```bash
+# Start all services (API, Prometheus, Grafana, Jaeger, OPA, Redis)
+make demo-up
+
+# Services will be available at:
+# • API:        http://localhost:8000
+# • Grafana:    http://localhost:3010  (admin/devops123)
+# • Prometheus: http://localhost:9090
+# • Jaeger:     http://localhost:16686
+
+# Stop services when done
+make demo-down
 ```
 
 ### Demo Scenarios
 
-| Scenario | Description |
-|----------|-------------|
-| **1. Intent → Infra** | Natural language to Terraform + CI/CD |
-| **2. Error Handling** | Inject error → Classify → Smart replan |
-| **3. FinOps Analysis** | Tree-of-Thought cost optimization |
+| Scenario | Command | Description |
+|----------|---------|-------------|
+| **1. Intent → Infra** | `make demo-scenario-1` | Natural language to Terraform + CI/CD |
+| **2. Error Handling** | `make demo-scenario-2` | Inject error → Classify → Smart replan |
+| **3. FinOps Analysis** | `make demo-scenario-3` | Tree-of-Thought cost optimization |
+
+### AWS Deployment (Optional)
 
 ```bash
-# Run individual scenarios
-make demo-scenario-1   # Intent → Infrastructure
-make demo-scenario-2   # Error handling
-make demo-scenario-3   # FinOps optimization
+# Deploy to AWS ECS Fargate (requires AWS credentials)
+cp infra/terraform.tfvars.example infra/terraform.tfvars
+# Edit terraform.tfvars with your API keys
 
-# Full demo with services
-make demo-up           # Starts Docker + runs all scenarios
-make demo-down         # Stop services
+make aws-up      # Deploy full stack to AWS
+make aws-status  # Show endpoints
+make aws-down    # Destroy infrastructure (avoid costs)
 ```
+
+### Host Static Demo (Cloudflare Pages / Netlify)
+
+Share the demo with recruiters via a static landing page:
+
+| Platform | Method |
+|----------|--------|
+| **Cloudflare Pages** | Dashboard → Workers & Pages → Upload `docs/demo-site` |
+| **Cloudflare CLI** | `cd docs/demo-site && wrangler pages deploy .` |
+| **Netlify** | Drag `docs/demo-site` to [netlify.com](https://app.netlify.com) |
+
+[Full deployment guide →](docs/DEMO_PREVIEW.md#hosting-the-demo-site)
 
 ---
 
@@ -134,10 +225,11 @@ make demo-up
 | Service | URL | Purpose |
 |---------|-----|---------|
 | API | http://localhost:8000 | Main FastAPI application |
-| Docs | http://localhost:8000/docs | OpenAPI documentation |
-| Jaeger | http://localhost:16686 | Distributed traces |
-| Prometheus | http://localhost:9090 | Metrics |
-| Grafana | http://localhost:3000 | Dashboards |
+| API Docs | http://localhost:8000/docs | OpenAPI documentation |
+| Grafana | http://localhost:3010 | Dashboards (admin/devops123) |
+| Prometheus | http://localhost:9090 | Metrics collection |
+| Jaeger | http://localhost:16686 | Distributed tracing |
+| OPA | http://localhost:8182 | Policy engine |
 
 ---
 

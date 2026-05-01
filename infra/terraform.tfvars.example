@@ -1,0 +1,33 @@
+# =============================================================================
+# Terraform Variables - Copy to terraform.tfvars and fill in values
+# =============================================================================
+
+# AWS Region
+aws_region = "us-east-1"
+
+# Environment name
+environment = "demo"
+
+# VPC CIDR
+vpc_cidr = "10.0.0.0/16"
+
+# =============================================================================
+# API Keys (REQUIRED - Keep these secret!)
+# =============================================================================
+
+# Your Anthropic API key
+anthropic_api_key = "sk-ant-xxxxx"
+
+# Your OpenAI API key (optional, used as fallback)
+openai_api_key = "sk-xxxxx"
+
+# =============================================================================
+# Container Images
+# =============================================================================
+
+# API image - use ECR repository after pushing
+# api_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/agentic-devops-api:latest"
+api_image = "agentic-devops-api:latest"
+
+# Grafana image (official)
+grafana_image = "grafana/grafana:latest"

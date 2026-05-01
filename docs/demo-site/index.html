@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DevOps Agent Platform - Live Demo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/asciinema-player/3.6.1/bundle/asciinema-player.min.css">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --border: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .badges {
+            margin-top: 1.5rem;
+        }
+
+        .badges img {
+            margin: 0 0.25rem;
+        }
+
+        .section {
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h2 {
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .demo-player {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .feature {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .feature h3 {
+            color: var(--success);
+            margin-bottom: 0.5rem;
+        }
+
+        .feature p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .code-block {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            color: var(--success);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: var(--bg-primary);
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .scenarios {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .scenario {
+            background: var(--bg-secondary);
+            padding: 1.25rem;
+            border-radius: 8px;
+            border-left: 3px solid var(--success);
+        }
+
+        .scenario h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .scenario p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        footer a {
+            color: var(--accent);
+        }
+
+        .architecture {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+            white-space: pre;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI DevOps Agent Platform</h1>
+            <p class="tagline">Transform natural language into production-ready cloud infrastructure with AI-powered multi-agent orchestration</p>
+            <div class="badges">
+                <img src="https://img.shields.io/badge/tests-70%20passed-brightgreen" alt="Tests">
+                <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
+                <img src="https://img.shields.io/badge/terraform-validated-purple" alt="Terraform">
+                <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+            </div>
+        </header>
+
+        <section class="section">
+            <h2>Live Demo (Terminal Recording)</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">Watch the AI agent convert natural language to Terraform infrastructure:</p>
+            <div class="demo-player">
+                <div id="player"></div>
+            </div>
+            <p style="color: var(--text-secondary); margin-top: 1rem; font-size: 0.9rem;">
+                Click to play. Use keyboard: Space (pause), arrow keys (seek), f (fullscreen)
+            </p>
+        </section>
+
+        <section class="section">
+            <h2>What It Does</h2>
+            <div class="scenarios">
+                <div class="scenario">
+                    <h4>1. Intent to Infrastructure</h4>
+                    <p>Natural language → IntentSpec → Terraform + CI/CD pipelines with validation</p>
+                </div>
+                <div class="scenario">
+                    <h4>2. Smart Error Handling</h4>
+                    <p>15 error types classified → Chain-of-Thought replanning → Targeted fixes</p>
+                </div>
+                <div class="scenario">
+                    <h4>3. FinOps Optimization</h4>
+                    <p>Tree-of-Thought analysis of Lambda vs EKS vs ECS with cost breakdown</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Key Features</h2>
+            <div class="features">
+                <div class="feature">
+                    <h3>Confidence Tracking</h3>
+                    <p>4-band confidence system (stated → confirmed → inferred → speculative) prevents execution on uncertain intent</p>
+                </div>
+                <div class="feature">
+                    <h3>OPA Security Gates</h3>
+                    <p>Blocks wildcard IAM, open security groups, and prompt injection at the intent layer</p>
+                </div>
+                <div class="feature">
+                    <h3>Smart Replanning</h3>
+                    <p>Not naive retry - errors are classified into 15 types with targeted regeneration strategies</p>
+                </div>
+                <div class="feature">
+                    <h3>Full Observability</h3>
+                    <p>Prometheus metrics, Jaeger traces, Grafana dashboards - all pre-configured</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Try It Yourself</h2>
+            <div class="code-block">
+                <code>git clone https://github.com/mirdattamir/AgenticDevops.git && cd AgenticDevops
+python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+make demo-quick   # Runs in < 2 minutes, no Docker required</code>
+            </div>
+            <div style="margin-top: 1.5rem;">
+                <a href="https://github.com/mirdattamir/AgenticDevops" class="btn">View on GitHub</a>
+                <a href="https://github.com/mirdattamir/AgenticDevops/blob/main/docs/DEMO_PREVIEW.md" class="btn btn-secondary">Full Documentation</a>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Architecture</h2>
+            <div class="architecture">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         AI DevOps Agent Platform                            │
+│                                                                             │
+│  "Deploy a scalable web app on AWS with CI/CD"                              │
+│                              │                                              │
+│                              ▼                                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                      │
+│  │   Intent    │───▶│  Conflict   │───▶│    OPA      │                      │
+│  │   Parser    │    │  Detector   │    │  Security   │                      │
+│  └─────────────┘    └─────────────┘    └─────────────┘                      │
+│         │                                     │                             │
+│         ▼                                     ▼                             │
+│  ┌─────────────────────────────────────────────────────────────┐            │
+│  │              IntentSpec (Canonical Intent)                   │            │
+│  │  • Confidence: stated | confirmed | inferred | speculative  │            │
+│  └─────────────────────────────────────────────────────────────┘            │
+│                              │                                              │
+│         ┌────────────────────┼────────────────────┐                         │
+│         ▼                    ▼                    ▼                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                      │
+│  │   FinOps    │    │  Terraform  │    │   CI/CD     │                      │
+│  │   Scorer    │    │  Generator  │    │  Generator  │                      │
+│  └─────────────┘    └─────────────┘    └─────────────┘                      │
+│                            │                                                │
+│                            ▼                                                │
+│  ┌─────────────────────────────────────────────────────────────┐            │
+│  │  Validation Loop (Error → Classify → Fix → Regenerate)      │            │
+│  └─────────────────────────────────────────────────────────────┘            │
+│                              │                                              │
+│                              ▼                                              │
+│                     [Human Approval Gate]                                   │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+        </section>
+
+        <footer>
+            <p>Built with LangGraph, FastAPI, Terraform, OPA, OpenTelemetry</p>
+            <p><a href="https://github.com/mirdattamir/AgenticDevops">GitHub</a> · MIT License</p>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/asciinema-player/3.6.1/bundle/asciinema-player.min.js"></script>
+    <script>
+        // Load the cast file - update path when hosting
+        AsciinemaPlayer.create(
+            'demo-quick.cast',
+            document.getElementById('player'),
+            {
+                cols: 100,
+                rows: 30,
+                autoPlay: false,
+                preload: true,
+                theme: 'dracula',
+                fit: 'width',
+                idleTimeLimit: 2
+            }
+        );
+    </script>
+</body>
+</html>

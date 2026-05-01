@@ -10,8 +10,14 @@ import json
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentation
 from pydantic import BaseModel
+
+# Optional OpenTelemetry instrumentation
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    _otel_available = True
+except ImportError:
+    _otel_available = False
 
 from agents.intent_parser.dialogue_policy import DialogueAction, create_dialogue_policy
 from agents.intent_parser.semantic_extractor import create_extractor
@@ -27,8 +33,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Instrument with OpenTelemetry
-FastAPIInstrumentation().instrument_app(app)
+# Instrument with OpenTelemetry (if available)
+if _otel_available:
+    FastAPIInstrumentor.instrument_app(app)
 
 # Add Prometheus metrics endpoint
 metrics_app = make_asgi_app()
