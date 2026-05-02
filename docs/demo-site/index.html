@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI DevOps Agent Platform - Live Demo</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/asciinema-player/3.6.1/bundle/asciinema-player.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.7.0/dist/bundle/asciinema-player.css">
     <style>
         :root {
             --bg-primary: #0d1117;
@@ -23,7 +23,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
@@ -111,7 +111,7 @@
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border);
-            font-family: 'Monaco', 'Menlo', monospace;
+            font-family: 'Courier New', Courier, monospace;
             font-size: 0.9rem;
             overflow-x: auto;
         }
@@ -181,7 +181,7 @@
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border);
-            font-family: 'Monaco', 'Menlo', monospace;
+            font-family: 'Courier New', Courier, monospace;
             font-size: 0.75rem;
             overflow-x: auto;
             white-space: pre;
@@ -255,14 +255,29 @@
 
         <section class="section">
             <h2>Try It Yourself</h2>
+
+            <h3 style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 1rem;">🚀 Run in Browser (No Setup Required)</h3>
+            <div style="margin-bottom: 2rem;">
+                <a href="https://github.dev/dmiruke-ai/AgenticDevops" class="btn" target="_blank">
+                    ▶️ Open in GitHub Codespaces
+                </a>
+                <a href="https://gitpod.io/#https://github.com/dmiruke-ai/AgenticDevops" class="btn btn-secondary" target="_blank">
+                    🌐 Open in Gitpod
+                </a>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 2rem;">
+                ✨ One-click browser environments with everything pre-installed. Run <code style="background: var(--bg-secondary); padding: 0.2rem 0.5rem; border-radius: 3px;">make demo-quick</code> in the terminal.
+            </p>
+
+            <h3 style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 1rem;">💻 Or Run Locally</h3>
             <div class="code-block">
-                <code>git clone https://github.com/mirdattamir/AgenticDevops.git && cd AgenticDevops
+                <code>git clone https://github.com/dmiruke-ai/AgenticDevops.git && cd AgenticDevops
 python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
 make demo-quick   # Runs in < 2 minutes, no Docker required</code>
             </div>
             <div style="margin-top: 1.5rem;">
-                <a href="https://github.com/mirdattamir/AgenticDevops" class="btn">View on GitHub</a>
-                <a href="https://github.com/mirdattamir/AgenticDevops/blob/main/docs/DEMO_PREVIEW.md" class="btn btn-secondary">Full Documentation</a>
+                <a href="https://github.com/dmiruke-ai/AgenticDevops" class="btn">View on GitHub</a>
+                <a href="https://github.com/dmiruke-ai/AgenticDevops/blob/main/docs/DEMO_PREVIEW.md" class="btn btn-secondary">Full Documentation</a>
             </div>
         </section>
 
@@ -305,26 +320,51 @@ make demo-quick   # Runs in < 2 minutes, no Docker required</code>
 
         <footer>
             <p>Built with LangGraph, FastAPI, Terraform, OPA, OpenTelemetry</p>
-            <p><a href="https://github.com/mirdattamir/AgenticDevops">GitHub</a> · MIT License</p>
+            <p><a href="https://github.com/dmiruke-ai/AgenticDevops">GitHub</a> · MIT License</p>
         </footer>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/asciinema-player/3.6.1/bundle/asciinema-player.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.7.0/dist/bundle/asciinema-player.min.js"></script>
     <script>
-        // Load the cast file - update path when hosting
-        AsciinemaPlayer.create(
-            'demo-quick.cast',
-            document.getElementById('player'),
-            {
-                cols: 100,
-                rows: 30,
-                autoPlay: false,
-                preload: true,
-                theme: 'dracula',
-                fit: 'width',
-                idleTimeLimit: 2
+        // Wait for DOM and script to load
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing asciinema player...');
+
+            // Check if player element exists
+            const playerElement = document.getElementById('player');
+            if (!playerElement) {
+                console.error('Player element not found!');
+                return;
             }
-        );
+
+            // Check if AsciinemaPlayer is loaded
+            if (typeof AsciinemaPlayer === 'undefined') {
+                console.error('AsciinemaPlayer library not loaded!');
+                playerElement.innerHTML = '<p style="color: #f85149; padding: 2rem;">Error: Failed to load asciinema player. Please check your internet connection.</p>';
+                return;
+            }
+
+            try {
+                // Try to create the player
+                AsciinemaPlayer.create(
+                    './demo-quick.cast',  // Explicit relative path
+                    playerElement,
+                    {
+                        cols: 100,
+                        rows: 30,
+                        autoPlay: false,
+                        preload: true,
+                        theme: 'dracula',
+                        fit: 'width',
+                        idleTimeLimit: 2
+                    }
+                );
+                console.log('Player initialized successfully!');
+            } catch (error) {
+                console.error('Error creating player:', error);
+                playerElement.innerHTML = '<p style="color: #f85149; padding: 2rem;">Error loading terminal recording: ' + error.message + '</p>';
+            }
+        });
     </script>
 </body>
 </html>
