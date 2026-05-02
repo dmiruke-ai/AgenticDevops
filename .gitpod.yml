@@ -1,0 +1,48 @@
+# Gitpod configuration for AI DevOps Agent Platform
+# Opens in browser at gitpod.io
+
+image: gitpod/workspace-python-3.11
+
+tasks:
+  - name: Setup Environment
+    init: |
+      # Install dependencies
+      pip install -r requirements.txt
+      echo "✅ Dependencies installed"
+    command: |
+      # Welcome message
+      clear
+      echo "╔══════════════════════════════════════════════════════════════╗"
+      echo "║   AI DevOps Agent Platform - Browser Demo                   ║"
+      echo "╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      echo "🎬 Quick Start:"
+      echo "   make demo-quick     # Run 3 demo scenarios (mock mode)"
+      echo ""
+      echo "🚀 Full Stack:"
+      echo "   make demo-up        # Start Docker services + Grafana"
+      echo ""
+      echo "📖 Documentation:"
+      echo "   cat docs/DEMO_PREVIEW.md"
+      echo ""
+
+ports:
+  - port: 8000
+    onOpen: notify
+    description: FastAPI Application
+  - port: 3010
+    onOpen: notify
+    description: Grafana Dashboard
+  - port: 9090
+    onOpen: ignore
+    description: Prometheus
+  - port: 16686
+    onOpen: ignore
+    description: Jaeger UI
+
+vscode:
+  extensions:
+    - ms-python.python
+    - ms-python.vscode-pylance
+    - hashicorp.terraform
+    - redhat.vscode-yaml
